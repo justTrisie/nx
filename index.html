@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexus — Encrypted Messaging</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0e11;
+    --bg2: #13151a;
+    --bg3: #1a1d24;
+    --bg4: #22262f;
+    --bg5: #2a2f3a;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --accent: #5b6cf9;
+    --accent2: #7c8dfa;
+    --accent3: #3d4fd4;
+    --text: #e8eaf0;
+    --text2: #8b909e;
+    --text3: #555b6a;
+    --green: #3dd68c;
+    --red: #f05252;
+    --gold: #f5c842;
+    --pin: #f5a623;
+    --radius: 8px;
+    --radius2: 12px;
+    --sidebar-w: 200px;
+    --channels-w: 160px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── AUTH SCREEN ── */
+  #auth-screen {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .auth-box {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    padding: 2.5rem;
+    width: 380px;
+    position: relative;
+    overflow: hidden;
+  }
+  .auth-box::before {
+    content: '';
+    position: absolute;
+    top: -60px; left: -60px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(91,108,249,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .auth-logo {
+    font-size: 1.8rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 0.25rem;
+  }
+  .auth-logo span { color: var(--accent2); }
+  .auth-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 2rem;
+  }
+  .auth-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--bg3);
+    padding: 4px;
+    border-radius: var(--radius);
+    margin-bottom: 1.5rem;
+  }
+  .auth-tab {
+    flex: 1; text-align: center;
+    padding: 0.45rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text2);
+    transition: all 0.2s;
+  }
+  .auth-tab.active {
+    background: var(--accent);
+    color: #fff;
+  }
+  .auth-form { display: flex; flex-direction: column; gap: 0.75rem; }
+  .auth-form input {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.7rem 1rem;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .auth-form input:focus { border-color: var(--accent); }
+  .auth-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    color: #fff;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    margin-top: 0.25rem;
+  }
+  .auth-btn:hover { background: var(--accent2); }
+  .auth-btn:active { transform: scale(0.98); }
+  .auth-error {
+    font-size: 0.8rem;
+    color: var(--red);
+    text-align: center;
+    min-height: 1.2rem;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  #app {
+    display: none;
+    height: 100vh;
+    overflow: hidden;
+  }
+  .layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  .layout-main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── SERVER SIDEBAR ── */
+  .sidebar {
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+  }
+  .sidebar-header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .server-icon {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .server-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .sidebar-section {
+    padding: 1rem 0.75rem 0.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .sidebar-section button {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    transition: color 0.2s;
+    padding: 0 2px;
+  }
+  .sidebar-section button:hover { color: var(--text); }
+  .channel-list { flex: 1; overflow-y: auto; padding: 0 0.5rem; }
+  .channel-list::-webkit-scrollbar { width: 4px; }
+  .channel-list::-webkit-scrollbar-thumb { background: var(--bg5); border-radius: 2px; }
+  .channel-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--text2);
+    transition: all 0.15s;
+    position: relative;
+  }
+  .channel-item:hover { background: var(--bg3); color: var(--text); }
+  .channel-item.active { background: var(--bg4); color: var(--text); }
+  .channel-item .ch-hash {
+    color: var(--text3);
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .channel-item.active .ch-hash { color: var(--accent2); }
+  .channel-item .ch-name { flex: 1; truncate: clip; }
+  .ch-actions {
+    display: none;
+    gap: 2px;
+  }
+  .channel-item:hover .ch-actions { display: flex; }
+  .ch-actions button {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    transition: all 0.15s;
+  }
+  .ch-actions button:hover { background: var(--bg5); color: var(--text); }
+
+  /* ── CHANNELS PANEL ── */
+  .channels-panel {
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    width: var(--channels-w);
+    flex-shrink: 0;
+  }
+  .panel-header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+  }
+  .online-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+  }
+  .members-list { flex: 1; overflow-y: auto; padding: 0.5rem; }
+  .members-list::-webkit-scrollbar { width: 4px; }
+  .members-list::-webkit-scrollbar-thumb { background: var(--bg5); border-radius: 2px; }
+  .member-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    color: var(--text2);
+    transition: background 0.15s;
+    cursor: default;
+  }
+  .member-item:hover { background: var(--bg3); color: var(--text); }
+  .member-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--bg5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .member-status {
+    position: absolute;
+    bottom: -1px; right: -1px;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--green);
+    border: 2px solid var(--bg2);
+  }
+  .member-name { font-size: 0.85rem; }
+  .admin-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    background: rgba(91,108,249,0.2);
+    color: var(--accent2);
+    border-radius: 4px;
+    padding: 1px 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── CHAT AREA ── */
+  .chat-area {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg2);
+    flex: 1;
+    overflow: hidden;
+  }
+  .chat-header {
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+  }
+  .chat-header-hash {
+    font-size: 1.2rem;
+    color: var(--text3);
+    font-weight: 700;
+  }
+  .chat-header-name {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .chat-header-desc {
+    font-size: 0.8rem;
+    color: var(--text2);
+    margin-left: 0.5rem;
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--border2);
+  }
+  .encrypt-badge {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    background: rgba(61,214,140,0.1);
+    color: var(--green);
+    border: 1px solid rgba(61,214,140,0.2);
+    border-radius: 20px;
+    padding: 3px 10px;
+    letter-spacing: 0.08em;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .encrypt-badge::before {
+    content: '🔒';
+    font-size: 0.75rem;
+  }
+
+  /* ── PINNED BANNER ── */
+  .pinned-banner {
+    background: rgba(245,166,35,0.08);
+    border-bottom: 1px solid rgba(245,166,35,0.15);
+    padding: 0.5rem 1.25rem;
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+  .pinned-banner.show { display: flex; }
+  .pin-icon { color: var(--pin); font-size: 0.9rem; }
+  .pinned-banner-text {
+    font-size: 0.82rem;
+    color: var(--text2);
+    flex: 1;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .pinned-banner-text strong { color: var(--pin); }
+
+  /* ── MESSAGES ── */
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .messages::-webkit-scrollbar { width: 6px; }
+  .messages::-webkit-scrollbar-thumb { background: var(--bg5); border-radius: 3px; }
+
+  .day-divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1rem 0 0.5rem;
+  }
+  .day-divider::before, .day-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .day-divider span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .msg-group {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius);
+    position: relative;
+    transition: background 0.1s;
+  }
+  .msg-group:hover { background: var(--bg3); }
+  .msg-group.pinned-msg {
+    background: rgba(245,166,35,0.05);
+    border-left: 2px solid var(--pin);
+    padding-left: calc(0.5rem - 2px);
+  }
+  .msg-group.pinned-msg:hover { background: rgba(245,166,35,0.09); }
+
+  .msg-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--bg5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .msg-content { flex: 1; min-width: 0; }
+  .msg-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 2px;
+  }
+  .msg-author {
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: default;
+  }
+  .msg-author.is-admin { color: var(--accent2); }
+  .msg-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text3);
+  }
+  .msg-text {
+    font-size: 0.9rem;
+    color: var(--text);
+    line-height: 1.5;
+    word-break: break-word;
+  }
+
+  .msg-actions {
+    position: absolute;
+    right: 0.5rem;
+    top: 0;
+    transform: translateY(-50%);
+    background: var(--bg4);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    display: none;
+    gap: 2px;
+    padding: 3px;
+  }
+  .msg-group:hover .msg-actions { display: flex; }
+  .msg-action-btn {
+    background: none;
+    border: none;
+    color: var(--text2);
+    cursor: pointer;
+    padding: 4px 7px;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    font-family: 'Syne', sans-serif;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .msg-action-btn:hover { background: var(--bg5); color: var(--text); }
+  .msg-action-btn.pin-btn { color: var(--pin); }
+  .msg-action-btn.delete-btn { color: var(--red); }
+
+  /* ── INPUT ── */
+  .chat-input-area {
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--bg4);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius2);
+    padding: 0.6rem 1rem;
+    transition: border-color 0.2s;
+  }
+  .input-wrapper:focus-within { border-color: var(--accent); }
+  .input-wrapper input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 0.9rem;
+  }
+  .input-wrapper input::placeholder { color: var(--text3); }
+  .send-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    width: 30px; height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #fff;
+    font-size: 1rem;
+    transition: background 0.2s, transform 0.1s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { background: var(--accent2); }
+  .send-btn:active { transform: scale(0.92); }
+
+  /* ── STATUS BAR ── */
+  .statusbar {
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    gap: 1rem;
+    height: 48px;
+    flex-shrink: 0;
+  }
+  .status-user {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .status-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--accent3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    position: relative;
+  }
+  .status-avatar-dot {
+    position: absolute;
+    bottom: -1px; right: -1px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    border: 2px solid var(--bg);
+  }
+  .status-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .status-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text3);
+  }
+  .status-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .status-btn {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    font-family: 'Syne', sans-serif;
+    transition: all 0.2s;
+  }
+  .status-btn:hover { background: var(--bg3); color: var(--text); }
+  .status-btn.danger:hover { background: rgba(240,82,82,0.15); color: var(--red); }
+
+  /* ── MODALS ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 500;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 14px;
+    padding: 1.75rem;
+    width: 380px;
+    max-width: 90vw;
+  }
+  .modal h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .modal-form { display: flex; flex-direction: column; gap: 0.75rem; }
+  .modal-form input, .modal-form select {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.65rem 0.9rem;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+  .modal-form input:focus, .modal-form select:focus { border-color: var(--accent); }
+  .modal-form select option { background: var(--bg3); }
+  .modal-label {
+    font-size: 0.8rem;
+    color: var(--text2);
+    margin-bottom: 0.3rem;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .modal-btns {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 0.5rem;
+  }
+  .modal-btn {
+    flex: 1;
+    padding: 0.65rem;
+    border-radius: var(--radius);
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .modal-btn.primary { background: var(--accent); color: #fff; }
+  .modal-btn.primary:hover { background: var(--accent2); }
+  .modal-btn.secondary { background: var(--bg4); color: var(--text2); }
+  .modal-btn.secondary:hover { background: var(--bg5); color: var(--text); }
+
+  .chat-inner {
+    max-width: 860px;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+  }
+  .no-channel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text3);
+    gap: 0.75rem;
+    font-size: 0.9rem;
+  }
+  .no-channel-icon {
+    font-size: 3rem;
+    opacity: 0.3;
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-messages {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text3);
+    gap: 0.5rem;
+  }
+  .empty-messages-icon { font-size: 2.5rem; opacity: 0.3; margin-bottom: 0.5rem; }
+  .empty-messages h4 { font-size: 1rem; font-weight: 600; color: var(--text2); }
+  .empty-messages p { font-size: 0.85rem; }
+
+  /* scrollbar consistent */
+  .channel-list::-webkit-scrollbar-track { background: transparent; }
+  .members-list::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-track { background: transparent; }
+
+  .firebase-config-note {
+    background: rgba(245, 200, 66, 0.08);
+    border: 1px solid rgba(245, 200, 66, 0.2);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    font-size: 0.82rem;
+    color: #f5c842;
+    margin-bottom: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.5;
+  }
+
+  .loading-overlay {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    gap: 1rem;
+  }
+  .loading-logo {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -1px;
+  }
+  .loading-logo span { color: var(--accent2); }
+  .loading-spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--bg4);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-overlay" class="loading-overlay">
+  <div class="loading-logo">NEX<span>US</span></div>
+  <div class="loading-spinner"></div>
+  <div class="loading-status" id="loading-status">INITIALISING</div>
+</div>
+
+<!-- Auth Screen -->
+<div id="auth-screen" style="display:none">
+  <div class="auth-box">
+    <div class="auth-logo">NEX<span>US</span></div>
+    <div class="auth-sub">end-to-end encrypted</div>
+    <div id="config-note" class="firebase-config-note" style="display:none">
+      ⚠ Configure Firebase below in the script tag before use.
+    </div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tab-login" onclick="switchTab('login')">Sign In</div>
+      <div class="auth-tab" id="tab-signup" onclick="switchTab('signup')">Register</div>
+    </div>
+    <div class="auth-form">
+      <input type="text" id="auth-username" placeholder="Username" autocomplete="username" maxlength="32"/>
+      <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password"/>
+      <button class="auth-btn" onclick="handleAuth()">Sign In</button>
+      <div class="auth-error" id="auth-error"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="app">
+  <div class="layout">
+    <div class="layout-main">
+    <!-- Left Sidebar: channels -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="server-icon">N</div>
+        <div class="server-name">Nexus</div>
+      </div>
+      <div class="sidebar-section">
+        <span>Channels</span>
+        <button id="add-channel-btn" style="display:none" onclick="openAddChannel()" title="Add channel">＋</button>
+      </div>
+      <div class="channel-list" id="channel-list"></div>
+    </div>
+
+    <!-- Middle: members / info -->
+    <div class="channels-panel">
+      <div class="panel-header">
+        <div class="online-dot"></div>
+        <span>ONLINE — <span id="online-count">0</span></span>
+      </div>
+      <div class="members-list" id="members-list"></div>
+    </div>
+
+    <!-- Chat -->
+    <div class="chat-area" id="chat-area">
+      <div class="no-channel" id="no-channel-placeholder">
+        <div class="no-channel-icon">#</div>
+        <span>Select a channel to start chatting</span>
+      </div>
+      <div id="chat-content" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+        <div class="chat-header">
+          <span class="chat-header-hash">#</span>
+          <span class="chat-header-name" id="chat-channel-name">general</span>
+          <span class="chat-header-desc" id="chat-channel-desc"></span>
+          <div class="encrypt-badge">E2E ENCRYPTED</div>
+        </div>
+        <div class="pinned-banner" id="pinned-banner">
+          <span class="pin-icon">📌</span>
+          <span class="pinned-banner-text">📌 <strong id="pinned-count">0</strong> pinned messages in this channel</span>
+          <button onclick="togglePinnedView()" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:0.8rem;font-family:'Syne',sans-serif;">View</button>
+        </div>
+        <div class="chat-inner">
+        <div class="messages" id="messages"></div>
+        <div class="chat-input-area">
+          <div class="input-wrapper">
+            <input type="text" id="msg-input" placeholder="Message #general" onkeydown="handleEnter(event)"/>
+            <button class="send-btn" onclick="sendMessage()">➤</button>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    </div><!-- end layout-main -->
+    <!-- Status bar -->
+    <div class="statusbar">
+      <div class="status-user">
+        <div class="status-avatar" id="status-avatar">
+          ?
+          <div class="status-avatar-dot"></div>
+        </div>
+        <div>
+          <div class="status-name" id="status-name">—</div>
+          <div class="status-tag" id="status-tag">#0000</div>
+        </div>
+        <div class="admin-badge" id="status-admin-badge" style="display:none">admin</div>
+      </div>
+      <div class="status-right">
+        <button class="status-btn danger" onclick="signOut()">Sign Out</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Channel Modal -->
+<div class="modal-overlay" id="add-channel-modal">
+  <div class="modal">
+    <h3>＋ Create Channel</h3>
+    <div class="modal-form">
+      <div>
+        <div class="modal-label">Channel Name</div>
+        <input type="text" id="new-channel-name" placeholder="e.g. announcements" maxlength="32"/>
+      </div>
+      <div>
+        <div class="modal-label">Description (optional)</div>
+        <input type="text" id="new-channel-desc" placeholder="What's this channel for?" maxlength="80"/>
+      </div>
+      <div class="modal-btns">
+        <button class="modal-btn secondary" onclick="closeModal('add-channel-modal')">Cancel</button>
+        <button class="modal-btn primary" onclick="createChannel()">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pinned Messages Modal -->
+<div class="modal-overlay" id="pinned-modal">
+  <div class="modal" style="width:480px">
+    <h3>📌 Pinned Messages</h3>
+    <div id="pinned-list" style="display:flex;flex-direction:column;gap:0.6rem;max-height:350px;overflow-y:auto;margin-bottom:1rem;padding-right:4px;"></div>
+    <div class="modal-btns">
+      <button class="modal-btn secondary" onclick="closeModal('pinned-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+  // ═══════════════════════════════════════════════════════════════════
+  // 🔧 CONFIGURE FIREBASE HERE
+  // Replace with your own Firebase project config from:
+  // console.firebase.google.com → Your Project → Settings → Web App
+  // Enable: Realtime Database only (no Auth needed)
+  // ═══════════════════════════════════════════════════════════════════
+  const firebaseConfig = {
+  apiKey: "AIzaSyD2LR38gqUdsXc-J7RTry3I9ANaubffsBE",
+  authDomain: "schoolcord-fafe5.firebaseapp.com",
+  projectId: "schoolcord-fafe5",
+  storageBucket: "schoolcord-fafe5.firebasestorage.app",
+  messagingSenderId: "941257163393",
+  appId: "1:941257163393:web:39519d120b105df9334380",
+  databaseURL: "https://schoolcord-fafe5-default-rtdb.europe-west1.firebasedatabase.app/"
+};
+  // ═══════════════════════════════════════════════════════════════════
+
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getDatabase, ref, push, onValue, set, update, remove,
+    serverTimestamp, query, orderByChild, get, off
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  // ── SHA-256 password hashing ──
+  async function hashPassword(password, salt) {
+    const enc = new TextEncoder();
+    const data = enc.encode(salt + password + "nexus-pepper-v1");
+    const hash = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  function generateSalt() {
+    return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  // ── AES-GCM message encryption ──
+  const MSG_ENC_KEY = "nexus-e2e-shared-key-v1";
+
+  async function getMsgKey() {
+    const enc = new TextEncoder();
+    const km = await crypto.subtle.importKey("raw", enc.encode(MSG_ENC_KEY), { name: "PBKDF2" }, false, ["deriveBits","deriveKey"]);
+    return crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt: enc.encode("nexus-msg-salt"), iterations: 100000, hash: "SHA-256" },
+      km, { name: "AES-GCM", length: 256 }, false, ["encrypt","decrypt"]
+    );
+  }
+
+  async function encryptMessage(plaintext) {
+    try {
+      const key = await getMsgKey();
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const enc = new TextEncoder();
+      const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(plaintext));
+      const combined = new Uint8Array(iv.length + ct.byteLength);
+      combined.set(iv, 0);
+      combined.set(new Uint8Array(ct), iv.length);
+      return btoa(String.fromCharCode(...combined));
+    } catch(e) { return plaintext; }
+  }
+
+  async function decryptMessage(ciphertext) {
+    try {
+      const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
+      const iv = combined.slice(0, 12);
+      const data = combined.slice(12);
+      const key = await getMsgKey();
+      const dec = new TextDecoder();
+      const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
+      return dec.decode(plain);
+    } catch(e) { return "[encrypted message]"; }
+  }
+
+  // ── Session (localStorage) ──
+  const SESSION_KEY = "nexus_session_v1";
+  function saveSession(uid, username) { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, username })); }
+  function loadSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; } }
+  function clearSession() { localStorage.removeItem(SESSION_KEY); }
+
+  // ── State ──
+  const isConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY";
+  let db;
+  let currentUser = null;      // { uid, username }
+  let currentUserData = null;  // from DB: { username, isAdmin, ... }
+  let currentChannel = null;
+  let messagesListener = null;
+  let onlineInterval = null;
+
+  function setLoading(msg) { document.getElementById('loading-status').textContent = msg; }
+
+  if (!isConfigured) {
+    document.getElementById('loading-overlay').style.display = 'none';
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('config-note').style.display = 'block';
+  } else {
+    init();
+  }
+
+  async function init() {
+    setLoading('CONNECTING TO FIREBASE');
+    try {
+      const app = initializeApp(firebaseConfig);
+      db = getDatabase(app);
+      setLoading('CHECKING SESSION');
+      const session = loadSession();
+      if (session) {
+        const snap = await get(ref(db, `users/${session.uid}`));
+        if (snap.exists()) {
+          currentUser = session;
+          currentUserData = snap.val();
+          document.getElementById('loading-overlay').style.display = 'none';
+          showApp();
+          return;
+        } else { clearSession(); }
+      }
+      document.getElementById('loading-overlay').style.display = 'none';
+      document.getElementById('auth-screen').style.display = 'flex';
+    } catch(e) { setLoading('ERROR: ' + e.message); }
+  }
+
+  // ── Auth ──
+  window.switchTab = function(tab) {
+    const isLogin = tab === 'login';
+    document.getElementById('tab-login').classList.toggle('active', isLogin);
+    document.getElementById('tab-signup').classList.toggle('active', !isLogin);
+    document.querySelector('.auth-btn').textContent = isLogin ? 'Sign In' : 'Create Account';
+    document.getElementById('auth-error').textContent = '';
+  };
+
+  window.handleAuth = async function() {
+    const username = document.getElementById('auth-username').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const password = document.getElementById('auth-password').value;
+    const isSignup = document.getElementById('tab-signup').classList.contains('active');
+    const errEl = document.getElementById('auth-error');
+    errEl.textContent = '';
+
+    if (!username || username.length < 2) { errEl.textContent = 'Username must be at least 2 characters (a–z, 0–9, _).'; return; }
+    if (!password || password.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+
+    try {
+      if (isSignup) {
+        // Check username not taken
+        const existing = await get(ref(db, `usernames/${username}`));
+        if (existing.exists()) { errEl.textContent = 'That username is already taken.'; return; }
+
+        const uid = 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+        const salt = generateSalt();
+        const hash = await hashPassword(password, salt);
+
+        // First ever user becomes admin
+        const allUsers = await get(ref(db, 'users'));
+        const isFirst = !allUsers.exists();
+
+        const userData = { username, uid, isAdmin: isFirst, salt, hash, joinedAt: Date.now() };
+        await set(ref(db, `users/${uid}`), userData);
+        await set(ref(db, `usernames/${username}`), uid);
+
+        if (isFirst) {
+          await set(ref(db, 'channels/general'), {
+            name: 'general', description: 'General conversation',
+            createdAt: Date.now(), createdBy: uid
+          });
+        }
+
+        currentUser = { uid, username };
+        currentUserData = userData;
+        saveSession(uid, username);
+        document.getElementById('auth-screen').style.display = 'none';
+        showApp();
+      } else {
+        // Login: look up uid by username
+        const uidSnap = await get(ref(db, `usernames/${username}`));
+        if (!uidSnap.exists()) { errEl.textContent = 'No account found with that username.'; return; }
+        const uid = uidSnap.val();
+        const userSnap = await get(ref(db, `users/${uid}`));
+        if (!userSnap.exists()) { errEl.textContent = 'Account data missing. Contact admin.'; return; }
+        const userData = userSnap.val();
+        const hash = await hashPassword(password, userData.salt);
+        if (hash !== userData.hash) { errEl.textContent = 'Incorrect password.'; return; }
+
+        currentUser = { uid, username };
+        currentUserData = userData;
+        saveSession(uid, username);
+        document.getElementById('auth-screen').style.display = 'none';
+        showApp();
+      }
+    } catch(e) { errEl.textContent = 'Error: ' + e.message; }
+  };
+
+  // Enter key on auth inputs
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && document.getElementById('auth-screen').style.display !== 'none') {
+      handleAuth();
+    }
+  });
+
+  window.signOut = async function() {
+    if (messagesListener) off(messagesListener);
+    if (onlineInterval) clearInterval(onlineInterval);
+    if (currentUser) await set(ref(db, `presence/${currentUser.uid}`), { online: false });
+    clearSession();
+    currentUser = null; currentUserData = null; currentChannel = null;
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('auth-username').value = '';
+    document.getElementById('auth-password').value = '';
+    document.getElementById('chat-content').style.display = 'none';
+    document.getElementById('no-channel-placeholder').style.display = 'flex';
+  };
+
+  function showApp() {
+    document.getElementById('app').style.display = 'block';
+    updateStatusBar();
+    loadChannels();
+    loadMembers();
+    setPresence();
+    document.getElementById('add-channel-btn').style.display = currentUserData?.isAdmin ? 'block' : 'none';
+  }
+
+  function setPresence() {
+    const presRef = ref(db, `presence/${currentUser.uid}`);
+    const data = { online: true, uid: currentUser.uid, username: currentUser.username };
+    set(presRef, data);
+    onlineInterval = setInterval(() => set(presRef, data), 30000);
+    window.addEventListener('beforeunload', () => set(presRef, { online: false, uid: currentUser.uid }));
+  }
+
+  function updateStatusBar() {
+    const name = currentUserData.username || 'user';
+    const initials = name.slice(0,2).toUpperCase();
+    document.getElementById('status-name').textContent = name;
+    document.getElementById('status-avatar').childNodes[0].textContent = initials;
+    document.getElementById('status-tag').textContent = '#' + currentUser.uid.slice(-4).toUpperCase();
+    document.getElementById('status-admin-badge').style.display = currentUserData.isAdmin ? 'inline-block' : 'none';
+  }
+
+  function loadChannels() {
+    onValue(ref(db, 'channels'), (snap) => {
+      const list = document.getElementById('channel-list');
+      list.innerHTML = '';
+      if (!snap.exists()) return;
+      Object.entries(snap.val()).forEach(([id, ch]) => {
+        const item = document.createElement('div');
+        item.className = 'channel-item' + (currentChannel === id ? ' active' : '');
+        item.dataset.id = id;
+        item.innerHTML = `
+          <span class="ch-hash">#</span>
+          <span class="ch-name">${escHtml(ch.name)}</span>
+          <div class="ch-actions">
+            ${currentUserData?.isAdmin ? `<button onclick="deleteChannel('${id}',event)" title="Delete">🗑</button>` : ''}
+          </div>`;
+        item.onclick = (e) => { if (!e.target.closest('.ch-actions')) selectChannel(id, ch); };
+        list.appendChild(item);
+      });
+    });
+  }
+
+  window.selectChannel = function(id, ch) {
+    currentChannel = id;
+    document.querySelectorAll('.channel-item').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+    document.getElementById('no-channel-placeholder').style.display = 'none';
+    document.getElementById('chat-content').style.display = 'flex';
+    document.getElementById('chat-channel-name').textContent = ch.name;
+    document.getElementById('chat-channel-desc').textContent = ch.description || '';
+    document.getElementById('msg-input').placeholder = `Message #${ch.name}`;
+    loadMessages(id);
+  };
+
+  function loadMessages(channelId) {
+    const messagesEl = document.getElementById('messages');
+    messagesEl.innerHTML = '';
+    if (messagesListener) off(messagesListener);
+    const msgsRef = query(ref(db, `messages/${channelId}`), orderByChild('timestamp'));
+    messagesListener = msgsRef;
+    onValue(msgsRef, async (snap) => {
+      if (!snap.exists()) {
+        messagesEl.innerHTML = `<div class="empty-messages"><div class="empty-messages-icon">💬</div><h4>No messages yet</h4><p>Be the first to say something!</p></div>`;
+        document.getElementById('pinned-banner').classList.remove('show');
+        return;
+      }
+      const msgs = snap.val();
+      messagesEl.innerHTML = '';
+      let lastDate = null;
+      const entries = Object.entries(msgs);
+      const decrypted = await Promise.all(entries.map(async ([id, msg]) => [id, { ...msg, decryptedText: await decryptMessage(msg.text) }]));
+      let pinnedCount = 0;
+      decrypted.forEach(([id, msg]) => {
+        const date = new Date(msg.timestamp || Date.now());
+        const dateStr = date.toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
+        if (dateStr !== lastDate) {
+          lastDate = dateStr;
+          const div = document.createElement('div');
+          div.className = 'day-divider';
+          div.innerHTML = `<span>${dateStr}</span>`;
+          messagesEl.appendChild(div);
+        }
+        if (msg.pinned) pinnedCount++;
+        renderMessage(messagesEl, id, msg, channelId);
+      });
+      if (pinnedCount > 0) {
+        document.getElementById('pinned-banner').classList.add('show');
+        document.getElementById('pinned-count').textContent = pinnedCount;
+      } else {
+        document.getElementById('pinned-banner').classList.remove('show');
+      }
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    });
+  }
+
+  function renderMessage(container, id, msg, channelId) {
+    const isOwn = msg.uid === currentUser.uid;
+    const isAdmin = currentUserData?.isAdmin;
+    const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+    const initials = (msg.username || 'U').slice(0,2).toUpperCase();
+    const div = document.createElement('div');
+    div.className = 'msg-group' + (msg.pinned ? ' pinned-msg' : '');
+    div.dataset.id = id;
+    div.innerHTML = `
+      <div class="msg-avatar">${initials}</div>
+      <div class="msg-content">
+        <div class="msg-meta">
+          <span class="msg-author ${msg.isAdmin ? 'is-admin' : ''}">${escHtml(msg.username || 'unknown')}</span>
+          ${msg.isAdmin ? '<span class="admin-badge">admin</span>' : ''}
+          <span class="msg-time">${time}</span>
+          ${msg.pinned ? '<span style="font-size:0.75rem;color:var(--pin)">📌 pinned</span>' : ''}
+        </div>
+        <div class="msg-text">${escHtml(msg.decryptedText)}</div>
+      </div>
+      <div class="msg-actions">
+        ${isAdmin ? `<button class="msg-action-btn pin-btn" onclick="togglePin('${channelId}','${id}',${!!msg.pinned})">${msg.pinned ? '📌 Unpin' : '📌 Pin'}</button>` : ''}
+        ${(isOwn || isAdmin) ? `<button class="msg-action-btn delete-btn" onclick="deleteMessage('${channelId}','${id}')">🗑 Delete</button>` : ''}
+      </div>`;
+    container.appendChild(div);
+  }
+
+  window.togglePin = async (channelId, msgId, isPinned) => {
+    await update(ref(db, `messages/${channelId}/${msgId}`), { pinned: !isPinned });
+  };
+
+  window.deleteMessage = async (channelId, msgId) => {
+    if (confirm('Delete this message?')) await remove(ref(db, `messages/${channelId}/${msgId}`));
+  };
+
+  window.togglePinnedView = function() {
+    const modal = document.getElementById('pinned-modal');
+    const list = document.getElementById('pinned-list');
+    list.innerHTML = '<div style="color:var(--text3);font-size:0.85rem;">Loading…</div>';
+    modal.classList.add('show');
+    get(ref(db, `messages/${currentChannel}`)).then(async snap => {
+      list.innerHTML = '';
+      if (!snap.exists()) { list.innerHTML = '<div style="color:var(--text3);font-size:0.85rem;">No pinned messages.</div>'; return; }
+      let found = 0;
+      for (const [id, msg] of Object.entries(snap.val())) {
+        if (!msg.pinned) continue;
+        found++;
+        const text = await decryptMessage(msg.text);
+        const time = new Date(msg.timestamp || Date.now()).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+        const div = document.createElement('div');
+        div.style.cssText = 'background:var(--bg3);border-radius:8px;padding:0.75rem;border-left:3px solid var(--pin);';
+        div.innerHTML = `
+          <div style="display:flex;align-items:baseline;gap:0.5rem;margin-bottom:4px;">
+            <span style="font-size:0.85rem;font-weight:600;color:${msg.isAdmin?'var(--accent2)':'var(--text)'}">${escHtml(msg.username||'unknown')}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--text3)">${time}</span>
+          </div>
+          <div style="font-size:0.875rem;color:var(--text);line-height:1.5">${escHtml(text)}</div>`;
+        list.appendChild(div);
+      }
+      if (!found) list.innerHTML = '<div style="color:var(--text3);font-size:0.85rem;">No pinned messages.</div>';
+    });
+  };
+
+  window.sendMessage = async function() {
+    const input = document.getElementById('msg-input');
+    const text = input.value.trim();
+    if (!text || !currentChannel || !currentUser) return;
+    input.value = '';
+    const encrypted = await encryptMessage(text);
+    await push(ref(db, `messages/${currentChannel}`), {
+      text: encrypted,
+      uid: currentUser.uid,
+      username: currentUser.username,
+      isAdmin: !!currentUserData?.isAdmin,
+      timestamp: serverTimestamp(),
+      pinned: false
+    });
+  };
+
+  window.handleEnter = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
+
+  function loadMembers() {
+    onValue(ref(db, 'presence'), (snap) => {
+      const list = document.getElementById('members-list');
+      list.innerHTML = '';
+      if (!snap.exists()) { document.getElementById('online-count').textContent = '0'; return; }
+      const online = Object.values(snap.val()).filter(p => p.online);
+      document.getElementById('online-count').textContent = online.length;
+      online.forEach(p => {
+        const initials = (p.username || 'U').slice(0,2).toUpperCase();
+        const div = document.createElement('div');
+        div.className = 'member-item';
+        div.innerHTML = `<div class="member-avatar">${initials}<div class="member-status"></div></div><span class="member-name">${escHtml(p.username||'user')}</span>`;
+        list.appendChild(div);
+      });
+    });
+  }
+
+  window.openAddChannel = () => { document.getElementById('add-channel-modal').classList.add('show'); setTimeout(()=>document.getElementById('new-channel-name').focus(),50); };
+
+  window.createChannel = async function() {
+    const name = document.getElementById('new-channel-name').value.trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+    const desc = document.getElementById('new-channel-desc').value.trim();
+    if (!name) return;
+    await set(ref(db, `channels/${name}`), { name, description: desc, createdAt: Date.now(), createdBy: currentUser.uid });
+    document.getElementById('new-channel-name').value = '';
+    document.getElementById('new-channel-desc').value = '';
+    closeModal('add-channel-modal');
+  };
+
+  window.deleteChannel = async (id, e) => {
+    e.stopPropagation();
+    if (!currentUserData?.isAdmin) return;
+    if (!confirm(`Delete #${id} and all its messages?`)) return;
+    await remove(ref(db, `channels/${id}`));
+    await remove(ref(db, `messages/${id}`));
+    if (currentChannel === id) {
+      currentChannel = null;
+      document.getElementById('no-channel-placeholder').style.display = 'flex';
+      document.getElementById('chat-content').style.display = 'none';
+    }
+  };
+
+  window.closeModal = (id) => document.getElementById(id).classList.remove('show');
+  document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); }));
+
+  function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Firebase Realtime Database rules (paste into Firebase console → Database → Rules):
+  /*
+  {
+    "rules": {
+      "users": {
+        "$uid": {
+          ".read": "data.exists()",
+          ".write": "!data.exists()"
+        }
+      },
+      "usernames": {
+        ".read": true,
+        "$username": { ".write": "!data.exists()" }
+      },
+      "channels": { ".read": true, ".write": true },
+      "messages": {
+        "$channel": { ".read": true, ".write": true }
+      },
+      "presence": {
+        "$uid": { ".read": true, ".write": true }
+      }
+    }
+  }
+  */
+</script>
+</body>
+</html>
