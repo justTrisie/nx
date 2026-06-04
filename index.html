@@ -315,7 +315,7 @@
   .member-name { font-size: 0.85rem; }
   .admin-badge {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.6rem;
+    font-size: 0.66rem;
     background: rgba(91,108,249,0.2);
     color: var(--accent2);
     border-radius: 4px;
@@ -776,14 +776,12 @@
 </head>
 <body>
 
-<!-- Loading -->
 <div id="loading-overlay" class="loading-overlay">
   <div class="loading-logo">NEX<span>US</span></div>
   <div class="loading-spinner"></div>
   <div class="loading-status" id="loading-status">INITIALISING</div>
 </div>
 
-<!-- Auth Screen -->
 <div id="auth-screen" style="display:none">
   <div class="auth-box">
     <div class="auth-logo">NEX<span>US</span></div>
@@ -804,11 +802,9 @@
   </div>
 </div>
 
-<!-- Main App -->
 <div id="app">
   <div class="layout">
     <div class="layout-main">
-    <!-- Left Sidebar: channels -->
     <div class="sidebar">
       <div class="sidebar-header">
         <div class="server-icon">N</div>
@@ -821,7 +817,6 @@
       <div class="channel-list" id="channel-list"></div>
     </div>
 
-    <!-- Middle: members / info -->
     <div class="channels-panel">
       <div class="panel-header">
         <div class="online-dot"></div>
@@ -830,7 +825,6 @@
       <div class="members-list" id="members-list"></div>
     </div>
 
-    <!-- Chat -->
     <div class="chat-area" id="chat-area">
       <div class="no-channel" id="no-channel-placeholder">
         <div class="no-channel-icon">#</div>
@@ -860,9 +854,7 @@
       </div>
     </div>
 
-    </div><!-- end layout-main -->
-    <!-- Status bar -->
-    <div class="statusbar">
+    </div><div class="statusbar">
       <div class="status-user">
         <div class="status-avatar" id="status-avatar">
           ?
@@ -881,7 +873,6 @@
   </div>
 </div>
 
-<!-- Add Channel Modal -->
 <div class="modal-overlay" id="add-channel-modal">
   <div class="modal">
     <h3>＋ Create Channel</h3>
@@ -902,7 +893,6 @@
   </div>
 </div>
 
-<!-- Pinned Messages Modal -->
 <div class="modal-overlay" id="pinned-modal">
   <div class="modal" style="width:480px">
     <h3>📌 Pinned Messages</h3>
@@ -913,24 +903,16 @@
   </div>
 </div>
 
-<!-- Firebase SDK -->
 <script type="module">
-  // ═══════════════════════════════════════════════════════════════════
-  // 🔧 CONFIGURE FIREBASE HERE
-  // Replace with your own Firebase project config from:
-  // console.firebase.google.com → Your Project → Settings → Web App
-  // Enable: Realtime Database only (no Auth needed)
-  // ═══════════════════════════════════════════════════════════════════
   const firebaseConfig = {
-  apiKey: "AIzaSyD2LR38gqUdsXc-J7RTry3I9ANaubffsBE",
-  authDomain: "schoolcord-fafe5.firebaseapp.com",
-  projectId: "schoolcord-fafe5",
-  storageBucket: "schoolcord-fafe5.firebasestorage.app",
-  messagingSenderId: "941257163393",
-  appId: "1:941257163393:web:39519d120b105df9334380",
-  databaseURL: "https://schoolcord-fafe5-default-rtdb.europe-west1.firebasedatabase.app/"
-};
-  // ═══════════════════════════════════════════════════════════════════
+    apiKey: "AIzaSyD2LR38gqUdsXc-J7RTry3I9ANaubffsBE",
+    authDomain: "schoolcord-fafe5.firebaseapp.com",
+    projectId: "schoolcord-fafe5",
+    storageBucket: "schoolcord-fafe5.firebasestorage.app",
+    messagingSenderId: "941257163393",
+    appId: "1:941257163393:web:39519d120b105df9334380",
+    databaseURL: "https://schoolcord-fafe5-default-rtdb.europe-west1.firebasedatabase.app/"
+  };
 
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import {
@@ -938,15 +920,96 @@
     serverTimestamp, query, orderByChild, get, off
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
+  // ── PURE JS CRYPTO FALLBACKS FOR HTTP CONTEXTS ──
+  
+  // Custom SHA-256 for non-HTTPS connections
+  function jsSha256(str) {
+    function rotateRight(n, x) { return (x >>> n) | (x << (32 - n)); }
+    const k = [
+      0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+      0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+      0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+      0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+      0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+      0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+      0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+      0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+    ];
+    let words = [];
+    const ascii = unescape(encodeURIComponent(str));
+    for (let i = 0; i < ascii.length; i++) words[i >> 2] |= ascii.charCodeAt(i) << (24 - (i % 4) * 8);
+    const bits = ascii.length * 8;
+    words[bits >> 5] |= 0x80 << (24 - (bits % 32));
+    words[(((bits + 64) >> 9) << 4) + 15] = bits;
+    
+    let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a,
+        h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+        
+    for (let i = 0; i < words.length; i += 16) {
+      let w = words.slice(i, i + 16);
+      for (let j = 16; j < 64; j++) {
+        let s0 = rotateRight(7, w[j-15]) ^ rotateRight(18, w[j-15]) ^ (w[j-15] >>> 3);
+        let s1 = rotateRight(17, w[j-2]) ^ rotateRight(19, w[j-2]) ^ (w[j-2] >>> 10);
+        w[j] = (w[j-16] + s0 + w[j-7] + s1) | 0;
+      }
+      let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+      for (let j = 0; j < 64; j++) {
+        let S1 = rotateRight(6, e) ^ rotateRight(11, e) ^ rotateRight(25, e);
+        let ch = (e & f) ^ ((~e) & g);
+        let temp1 = (h + S1 + ch + k[j] + w[j]) | 0;
+        let S0 = rotateRight(2, a) ^ rotateRight(13, a) ^ rotateRight(22, a);
+        let maj = (a & b) ^ (a & c) ^ (b & c);
+        let temp2 = (S0 + maj) | 0;
+        h = g; g = f; f = e; e = (d + temp1) | 0;
+        d = c; c = b; b = a; a = (temp1 + temp2) | 0;
+      }
+      h0 = (h0 + a) | 0; h1 = (h1 + b) | 0; h2 = (h2 + c) | 0; h3 = (h3 + d) | 0;
+      h4 = (h4 + e) | 0; h5 = (h5 + f) | 0; h6 = (h6 + g) | 0; h7 = (h7 + h) | 0;
+    }
+    return [h0, h1, h2, h3, h4, h5, h6, h7].map(v => (v >>> 0).toString(16).padStart(8, '0')).join('');
+  }
+
+  // Simple XOR-based encryption matrix fallback mimicking structural length parity of standard setup
+  function jsXorCipher(text, keyHex, ivHex) {
+    const textBytes = new TextEncoder().encode(text);
+    const keyBytes = new TextEncoder().encode(keyHex);
+    const ivBytes = new TextEncoder().encode(ivHex);
+    const out = new Uint8Array(ivBytes.length + textBytes.length);
+    out.set(ivBytes, 0);
+    for (let i = 0; i < textBytes.length; i++) {
+      out[ivBytes.length + i] = textBytes[i] ^ keyBytes[i % keyBytes.length] ^ ivBytes[i % ivBytes.length];
+    }
+    return btoa(String.fromCharCode(...out));
+  }
+
+  function jsXorDecipher(cipherText, keyHex) {
+    const combined = Uint8Array.from(atob(cipherText), c => c.charCodeAt(0));
+    const ivBytes = combined.slice(0, 12);
+    const dataBytes = combined.slice(12);
+    const keyBytes = new TextEncoder().encode(keyHex);
+    const out = new Uint8Array(dataBytes.length);
+    for (let i = 0; i < dataBytes.length; i++) {
+      out[i] = dataBytes[i] ^ keyBytes[i % keyBytes.length] ^ ivBytes[i % ivBytes.length];
+    }
+    return new TextDecoder().decode(out);
+  }
+
   // ── SHA-256 password hashing ──
   async function hashPassword(password, salt) {
+    const baseStr = salt + password + "nexus-pepper-v1";
+    if (!window.crypto || !window.crypto.subtle) {
+      return jsSha256(baseStr);
+    }
     const enc = new TextEncoder();
-    const data = enc.encode(salt + password + "nexus-pepper-v1");
+    const data = enc.encode(baseStr);
     const hash = await crypto.subtle.digest("SHA-256", data);
     return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
   }
 
   function generateSalt() {
+    if (!window.crypto || !window.crypto.getRandomValues) {
+      return Array.from({length: 16}, () => Math.floor(Math.random() * 256)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
     return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2,'0')).join('');
   }
 
@@ -963,6 +1026,10 @@
   }
 
   async function encryptMessage(plaintext) {
+    if (!window.crypto || !window.crypto.subtle) {
+      const fallbackIv = Array.from({length: 12}, () => Math.floor(Math.random() * 256)).map(b => b.toString(16).padStart(2,'0')).join('').slice(0,12);
+      return jsXorCipher(plaintext, MSG_ENC_KEY, fallbackIv);
+    }
     try {
       const key = await getMsgKey();
       const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -976,6 +1043,11 @@
   }
 
   async function decryptMessage(ciphertext) {
+    if (!window.crypto || !window.crypto.subtle) {
+      try {
+        return jsXorDecipher(ciphertext, MSG_ENC_KEY);
+      } catch(e) { return "[encrypted message]"; }
+    }
     try {
       const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
       const iv = combined.slice(0, 12);
@@ -984,7 +1056,13 @@
       const dec = new TextDecoder();
       const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
       return dec.decode(plain);
-    } catch(e) { return "[encrypted message]"; }
+    } catch(e) { 
+      try {
+        return jsXorDecipher(ciphertext, MSG_ENC_KEY);
+      } catch(err) {
+        return "[encrypted message]"; 
+      }
+    }
   }
 
   // ── Session (localStorage) ──
@@ -1055,7 +1133,6 @@
 
     try {
       if (isSignup) {
-        // Check username not taken
         const existing = await get(ref(db, `usernames/${username}`));
         if (existing.exists()) { errEl.textContent = 'That username is already taken.'; return; }
 
@@ -1063,7 +1140,6 @@
         const salt = generateSalt();
         const hash = await hashPassword(password, salt);
 
-        // First ever user becomes admin
         const allUsers = await get(ref(db, 'users'));
         const isFirst = !allUsers.exists();
 
@@ -1084,7 +1160,6 @@
         document.getElementById('auth-screen').style.display = 'none';
         showApp();
       } else {
-        // Login: look up uid by username
         const uidSnap = await get(ref(db, `usernames/${username}`));
         if (!uidSnap.exists()) { errEl.textContent = 'No account found with that username.'; return; }
         const uid = uidSnap.val();
@@ -1103,7 +1178,6 @@
     } catch(e) { errEl.textContent = 'Error: ' + e.message; }
   };
 
-  // Enter key on auth inputs
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && document.getElementById('auth-screen').style.display !== 'none') {
       handleAuth();
@@ -1320,7 +1394,7 @@
     });
   }
 
-  window.openAddChannel = () => { document.getElementById('add-channel-modal').classList.add('show'); setTimeout(()=>document.getElementById('new-channel-name').focus(),50); };
+  window.openAddChannel = () => { document.getElementById('new-channel-name').focus(); setTimeout(()=>document.getElementById('new-channel-name').focus(),50); };
 
   window.createChannel = async function() {
     const name = document.getElementById('new-channel-name').value.trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
@@ -1351,31 +1425,6 @@
   function escHtml(str) {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
-
-  // Firebase Realtime Database rules (paste into Firebase console → Database → Rules):
-  /*
-  {
-    "rules": {
-      "users": {
-        "$uid": {
-          ".read": "data.exists()",
-          ".write": "!data.exists()"
-        }
-      },
-      "usernames": {
-        ".read": true,
-        "$username": { ".write": "!data.exists()" }
-      },
-      "channels": { ".read": true, ".write": true },
-      "messages": {
-        "$channel": { ".read": true, ".write": true }
-      },
-      "presence": {
-        "$uid": { ".read": true, ".write": true }
-      }
-    }
-  }
-  */
 </script>
 </body>
 </html>
