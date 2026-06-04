@@ -991,8 +991,8 @@
     return result;
   }
 
-  // Updated password hashing function utilizing legacy SHA-256
-  async function hashPassword(password, salt) {
+  // Password hashing function utilizing legacy SHA-256
+  function hashPassword(password, salt) {
     const data = salt + password + "nexus-pepper-v1";
     return sha256Legacy(data);
   }
@@ -1001,41 +1001,82 @@
     return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2,'0')).join('');
   }
 
-  // ── AES-GCM message encryption ──
+  // ── CUSTOM CRYPTO SYSTEM (Pure JS Synchronous Counter Mode Stream Cipher) ──
   const MSG_ENC_KEY = "nexus-e2e-shared-key-v1";
 
-  async function getMsgKey() {
-    const enc = new TextEncoder();
-    const km = await crypto.subtle.importKey("raw", enc.encode(MSG_ENC_KEY), { name: "PBKDF2" }, false, ["deriveBits","deriveKey"]);
-    return crypto.subtle.deriveKey(
-      { name: "PBKDF2", salt: enc.encode("nexus-msg-salt"), iterations: 100000, hash: "SHA-256" },
-      km, { name: "AES-GCM", length: 256 }, false, ["encrypt","decrypt"]
-    );
+  // helper to convert strings to UTF-8 hex array
+  function strToHexBytes(str) {
+    const encoder = new TextEncoder();
+    return Array.from(encoder.encode(str));
   }
 
-  async function encryptMessage(plaintext) {
-    try {
-      const key = await getMsgKey();
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-      const enc = new TextEncoder();
-      const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(plaintext));
-      const combined = new Uint8Array(iv.length + ct.byteLength);
-      combined.set(iv, 0);
-      combined.set(new Uint8Array(ct), iv.length);
-      return btoa(String.fromCharCode(...combined));
-    } catch(e) { return plaintext; }
+  // helper to convert string back from UTF-8 byte array
+  function bytesToStr(bytes) {
+    const decoder = new TextDecoder();
+    return decoder.decode(new Uint8Array(bytes));
   }
 
-  async function decryptMessage(ciphertext) {
+  function processCryptoCTR(bytes, keyStr, ivStr) {
+    let output = [];
+    let blockCounter = 0;
+    
+    for (let i = 0; i < bytes.length; i += 32) {
+      // Create unique input blocks by hashing Key + IV + Counter block index
+      let nonceBlock = keyStr + "-" + ivStr + "-" + blockCounter;
+      let keyStreamHex = sha256Legacy(nonceBlock);
+      
+      // Parse hex string keyStream into byte array chunks
+      let keyStreamBytes = [];
+      for (let c = 0; c < keyStreamHex.length; c += 2) {
+        keyStreamBytes.push(parseInt(keyStreamHex.substr(c, 2), 16));
+      }
+      
+      // XOR plain text bytes against keyStream chunks
+      for (let j = 0; j < 32 && (i + j) < bytes.length; j++) {
+        output.push(bytes[i + j] ^ keyStreamBytes[j]);
+      }
+      blockCounter++;
+    }
+    return output;
+  }
+
+  function encryptMessage(plaintext) {
     try {
-      const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
-      const iv = combined.slice(0, 12);
-      const data = combined.slice(12);
-      const key = await getMsgKey();
-      const dec = new TextDecoder();
-      const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
-      return dec.decode(plain);
-    } catch(e) { return "[encrypted message]"; }
+      if (!plaintext) return "";
+      // Create unique message IV
+      const iv = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2,'0')).join('');
+      const plainBytes = strToHexBytes(plaintext);
+      const encryptedBytes = processCryptoCTR(plainBytes, MSG_ENC_KEY, iv);
+      
+      // package structural format: IV_string:HEX_encrypted_payload
+      const encryptedHex = encryptedBytes.map(b => b.toString(16).padStart(2,'0')).join('');
+      return btoa(iv + ":" + encryptedHex);
+    } catch(e) { 
+      console.error(e);
+      return plaintext; 
+    }
+  }
+
+  function decryptMessage(ciphertext) {
+    try {
+      if (!ciphertext) return "";
+      const rawPayload = atob(ciphertext);
+      const splitIdx = rawPayload.indexOf(":");
+      if (splitIdx === -1) return "[encrypted message]";
+      
+      const iv = rawPayload.substring(0, splitIdx);
+      const hexCipher = rawPayload.substring(splitIdx + 1);
+      
+      const cipherBytes = [];
+      for (let i = 0; i < hexCipher.length; i += 2) {
+        cipherBytes.push(parseInt(hexCipher.substr(i, 2), 16));
+      }
+      
+      const decryptedBytes = processCryptoCTR(cipherBytes, MSG_ENC_KEY, iv);
+      return bytesToStr(decryptedBytes);
+    } catch(e) { 
+      return "[encrypted message]"; 
+    }
   }
 
   // ── Session (localStorage) ──
@@ -1112,7 +1153,7 @@
 
         const uid = 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
         const salt = generateSalt();
-        const hash = await hashPassword(password, salt);
+        const hash = hashPassword(password, salt);
 
         // First ever user becomes admin
         const allUsers = await get(ref(db, 'users'));
@@ -1142,7 +1183,7 @@
         const userSnap = await get(ref(db, `users/${uid}`));
         if (!userSnap.exists()) { errEl.textContent = 'Account data missing. Contact admin.'; return; }
         const userData = userSnap.val();
-        const hash = await hashPassword(password, userData.salt);
+        const hash = hashPassword(password, userData.salt);
         if (hash !== userData.hash) { errEl.textContent = 'Incorrect password.'; return; }
 
         currentUser = { uid, username };
@@ -1239,7 +1280,7 @@
     if (messagesListener) off(messagesListener);
     const msgsRef = query(ref(db, `messages/${channelId}`), orderByChild('timestamp'));
     messagesListener = msgsRef;
-    onValue(msgsRef, async (snap) => {
+    onValue(msgsRef, (snap) => {
       if (!snap.exists()) {
         messagesEl.innerHTML = `<div class="empty-messages"><div class="empty-messages-icon">💬</div><h4>No messages yet</h4><p>Be the first to say something!</p></div>`;
         document.getElementById('pinned-banner').classList.remove('show');
@@ -1249,9 +1290,12 @@
       messagesEl.innerHTML = '';
       let lastDate = null;
       const entries = Object.entries(msgs);
-      const decrypted = await Promise.all(entries.map(async ([id, msg]) => [id, { ...msg, decryptedText: await decryptMessage(msg.text) }]));
+      
       let pinnedCount = 0;
-      decrypted.forEach(([id, msg]) => {
+      entries.forEach(([id, msg]) => {
+        const decryptedText = decryptMessage(msg.text);
+        const msgWithDecrypted = { ...msg, decryptedText };
+
         const date = new Date(msg.timestamp || Date.now());
         const dateStr = date.toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
         if (dateStr !== lastDate) {
@@ -1262,7 +1306,7 @@
           messagesEl.appendChild(div);
         }
         if (msg.pinned) pinnedCount++;
-        renderMessage(messagesEl, id, msg, channelId);
+        renderMessage(messagesEl, id, msgWithDecrypted, channelId);
       });
       if (pinnedCount > 0) {
         document.getElementById('pinned-banner').classList.add('show');
@@ -1313,14 +1357,14 @@
     const list = document.getElementById('pinned-list');
     list.innerHTML = '<div style="color:var(--text3);font-size:0.85rem;">Loading…</div>';
     modal.classList.add('show');
-    get(ref(db, `messages/${currentChannel}`)).then(async snap => {
+    get(ref(db, `messages/${currentChannel}`)).then(snap => {
       list.innerHTML = '';
       if (!snap.exists()) { list.innerHTML = '<div style="color:var(--text3);font-size:0.85rem;">No pinned messages.</div>'; return; }
       let found = 0;
-      for (const [id, msg] of Object.entries(snap.val())) {
-        if (!msg.pinned) continue;
+      Object.entries(snap.val()).forEach(([id, msg]) => {
+        if (!msg.pinned) return;
         found++;
-        const text = await decryptMessage(msg.text);
+        const text = decryptMessage(msg.text);
         const time = new Date(msg.timestamp || Date.now()).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
         const div = document.createElement('div');
         div.style.cssText = 'background:var(--bg3);border-radius:8px;padding:0.75rem;border-left:3px solid var(--pin);';
@@ -1331,7 +1375,7 @@
           </div>
           <div style="font-size:0.875rem;color:var(--text);line-height:1.5">${escHtml(text)}</div>`;
         list.appendChild(div);
-      }
+      });
       if (!found) list.innerHTML = '<div style="color:var(--text3);font-size:0.85rem;">No pinned messages.</div>';
     });
   };
@@ -1341,7 +1385,7 @@
     const text = input.value.trim();
     if (!text || !currentChannel || !currentUser) return;
     input.value = '';
-    const encrypted = await encryptMessage(text);
+    const encrypted = encryptMessage(text);
     await push(ref(db, `messages/${currentChannel}`), {
       text: encrypted,
       uid: currentUser.uid,
