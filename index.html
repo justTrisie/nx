@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nexus — Encrypted Messaging</title>
+<title>Nexus — Messaging</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -356,23 +356,19 @@
     padding-left: 0.75rem;
     border-left: 1px solid var(--border2);
   }
-  .encrypt-badge {
+  .plaintext-badge {
     margin-left: auto;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.65rem;
-    background: rgba(61,214,140,0.1);
-    color: var(--green);
-    border: 1px solid rgba(61,214,140,0.2);
+    background: rgba(139,144,158,0.1);
+    color: var(--text2);
+    border: 1px solid rgba(139,144,158,0.2);
     border-radius: 20px;
     padding: 3px 10px;
     letter-spacing: 0.08em;
     display: flex;
     align-items: center;
     gap: 4px;
-  }
-  .encrypt-badge::before {
-    content: '🔒';
-    font-size: 0.75rem;
   }
 
   /* ── PINNED BANNER ── */
@@ -785,7 +781,7 @@
 <div id="auth-screen" style="display:none">
   <div class="auth-box">
     <div class="auth-logo">NEX<span>US</span></div>
-    <div class="auth-sub">end-to-end encrypted</div>
+    <div class="auth-sub">standard messaging</div>
     <div id="config-note" class="firebase-config-note" style="display:none">
       ⚠ Configure Firebase below in the script tag before use.
     </div>
@@ -835,7 +831,7 @@
           <span class="chat-header-hash">#</span>
           <span class="chat-header-name" id="chat-channel-name">general</span>
           <span class="chat-header-desc" id="chat-channel-desc"></span>
-          <div class="encrypt-badge">E2E ENCRYPTED</div>
+          <div class="plaintext-badge">PLAINTEXT</div>
         </div>
         <div class="pinned-banner" id="pinned-banner">
           <span class="pin-icon">📌</span>
@@ -906,9 +902,6 @@
 <script type="module">
   // ═══════════════════════════════════════════════════════════════════
   // 🔧 CONFIGURE FIREBASE HERE
-  // Replace with your own Firebase project config from:
-  // console.firebase.google.com → Your Project → Settings → Web App
-  // Enable: Realtime Database only (no Auth needed)
   // ═══════════════════════════════════════════════════════════════════
   const firebaseConfig = {
     apiKey: "AIzaSyD2LR38gqUdsXc-J7RTry3I9ANaubffsBE",
@@ -927,7 +920,7 @@
     serverTimestamp, query, orderByChild, get, off
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-  // ── Legacy JS SHA-256 fallback implementation ──
+  // ── Legacy JS SHA-256 for account password hashing ──
   function sha256Legacy(ascii) {
     function rightRotate(value, amount) {
       return (value >>> amount) | (value << (32 - amount));
@@ -991,7 +984,6 @@
     return result;
   }
 
-  // Updated password hashing function utilizing legacy SHA-256
   async function hashPassword(password, salt) {
     const data = salt + password + "nexus-pepper-v1";
     return sha256Legacy(data);
@@ -999,93 +991,6 @@
 
   function generateSalt() {
     return Array.from(crypto.getRandomValues ? crypto.getRandomValues(new Uint8Array(16)) : Array.from({length:16}, () => Math.floor(Math.random()*256))).map(b => b.toString(16).padStart(2,'0')).join('');
-  }
-
-  // ── PURE JS CIPHER FALLBACK (RC4-like Stream Cipher for HTTP Compatibility) ──
-  function rc4Crypt(keyStr, plaintext) {
-    const s = new Array(256);
-    let j = 0, x;
-    for (let i = 0; i < 256; i++) s[i] = i;
-    for (let i = 0; i < 256; i++) {
-      j = (j + s[i] + keyStr.charCodeAt(i % keyStr.length)) % 256;
-      x = s[i]; s[i] = s[j]; s[j] = x;
-    }
-    let i = 0; j = 0;
-    const input = typeof plaintext === 'string' ? new TextEncoder().encode(plaintext) : plaintext;
-    const out = new Uint8Array(input.length);
-    for (let y = 0; y < input.length; y++) {
-      i = (i + 1) % 256;
-      j = (j + s[i]) % 256;
-      x = s[i]; s[i] = s[j]; s[j] = x;
-      out[y] = input[y] ^ s[(s[i] + s[j]) % 256];
-    }
-    return out;
-  }
-
-  const MSG_ENC_KEY = "nexus-e2e-shared-key-v1";
-
-  async function getMsgKey() {
-    const enc = new TextEncoder();
-    const km = await crypto.subtle.importKey("raw", enc.encode(MSG_ENC_KEY), { name: "PBKDF2" }, false, ["deriveBits","deriveKey"]);
-    return crypto.subtle.deriveKey(
-      { name: "PBKDF2", salt: enc.encode("nexus-msg-salt"), iterations: 100000, hash: "SHA-256" },
-      km, { name: "AES-GCM", length: 256 }, false, ["encrypt","decrypt"]
-    );
-  }
-
-  async function encryptMessage(plaintext) {
-    // Check if secure context context crypto exists
-    if (!window.crypto || !window.crypto.subtle) {
-      // Fallback for raw HTTP: Flag with a prefix so recipients know it used the pure-js cipher
-      const encryptedBytes = rc4Crypt(MSG_ENC_KEY, plaintext);
-      return "fallback:" + btoa(String.fromCharCode(...encryptedBytes));
-    }
-    try {
-      const key = await getMsgKey();
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-      const enc = new TextEncoder();
-      const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(plaintext));
-      const combined = new Uint8Array(iv.length + ct.byteLength);
-      combined.set(iv, 0);
-      combined.set(new Uint8Array(ct), iv.length);
-      return btoa(String.fromCharCode(...combined));
-    } catch(e) { 
-      const encryptedBytes = rc4Crypt(MSG_ENC_KEY, plaintext);
-      return "fallback:" + btoa(String.fromCharCode(...encryptedBytes));
-    }
-  }
-
-  async function decryptMessage(ciphertext) {
-    if (!ciphertext) return "";
-    
-    // Check if it was encrypted using the HTTP plain-text fallback cipher
-    if (ciphertext.startsWith("fallback:")) {
-      try {
-        const base64Data = ciphertext.substring(9);
-        const combined = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-        const decryptedBytes = rc4Crypt(MSG_ENC_KEY, combined);
-        return new TextDecoder().decode(decryptedBytes);
-      } catch(e) {
-        return "[decryption failure]";
-      }
-    }
-
-    // Standard AES-GCM flow if browser has cryptographic secure context access
-    if (!window.crypto || !window.crypto.subtle) {
-      return "[encrypted message — login via HTTPS to read high-grade payloads]";
-    }
-
-    try {
-      const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
-      const iv = combined.slice(0, 12);
-      const data = combined.slice(12);
-      const key = await getMsgKey();
-      const dec = new TextDecoder();
-      const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
-      return dec.decode(plain);
-    } catch(e) { 
-      return "[encrypted message]"; 
-    }
   }
 
   // ── Session (localStorage) ──
@@ -1156,7 +1061,6 @@
 
     try {
       if (isSignup) {
-        // Check username not taken
         const existing = await get(ref(db, `usernames/${username}`));
         if (existing.exists()) { errEl.textContent = 'That username is already taken.'; return; }
 
@@ -1164,7 +1068,6 @@
         const salt = generateSalt();
         const hash = await hashPassword(password, salt);
 
-        // First ever user becomes admin
         const allUsers = await get(ref(db, 'users'));
         const isFirst = !allUsers.exists();
 
@@ -1185,7 +1088,6 @@
         document.getElementById('auth-screen').style.display = 'none';
         showApp();
       } else {
-        // Login: look up uid by username
         const uidSnap = await get(ref(db, `usernames/${username}`));
         if (!uidSnap.exists()) { errEl.textContent = 'No account found with that username.'; return; }
         const uid = uidSnap.val();
@@ -1204,7 +1106,6 @@
     } catch(e) { errEl.textContent = 'Error: ' + e.message; }
   };
 
-  // Enter key on auth inputs
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && document.getElementById('auth-screen').style.display !== 'none') {
       handleAuth();
@@ -1289,7 +1190,7 @@
     if (messagesListener) off(messagesListener);
     const msgsRef = query(ref(db, `messages/${channelId}`), orderByChild('timestamp'));
     messagesListener = msgsRef;
-    onValue(msgsRef, async (snap) => {
+    onValue(msgsRef, (snap) => {
       if (!snap.exists()) {
         messagesEl.innerHTML = `<div class="empty-messages"><div class="empty-messages-icon">💬</div><h4>No messages yet</h4><p>Be the first to say something!</p></div>`;
         document.getElementById('pinned-banner').classList.remove('show');
@@ -1298,10 +1199,8 @@
       const msgs = snap.val();
       messagesEl.innerHTML = '';
       let lastDate = null;
-      const entries = Object.entries(msgs);
-      const decrypted = await Promise.all(entries.map(async ([id, msg]) => [id, { ...msg, decryptedText: await decryptMessage(msg.text) }]));
       let pinnedCount = 0;
-      decrypted.forEach(([id, msg]) => {
+      Object.entries(msgs).forEach(([id, msg]) => {
         const date = new Date(msg.timestamp || Date.now());
         const dateStr = date.toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
         if (dateStr !== lastDate) {
@@ -1341,7 +1240,7 @@
           <span class="msg-time">${time}</span>
           ${msg.pinned ? '<span style="font-size:0.75rem;color:var(--pin)">📌 pinned</span>' : ''}
         </div>
-        <div class="msg-text">${escHtml(msg.decryptedText)}</div>
+        <div class="msg-text">${escHtml(msg.text)}</div>
       </div>
       <div class="msg-actions">
         ${isAdmin ? `<button class="msg-action-btn pin-btn" onclick="togglePin('${channelId}','${id}',${!!msg.pinned})">${msg.pinned ? '📌 Unpin' : '📌 Pin'}</button>` : ''}
@@ -1363,14 +1262,13 @@
     const list = document.getElementById('pinned-list');
     list.innerHTML = '<div style="color:var(--text3);font-size:0.85rem;">Loading…</div>';
     modal.classList.add('show');
-    get(ref(db, `messages/${currentChannel}`)).then(async snap => {
+    get(ref(db, `messages/${currentChannel}`)).then(snap => {
       list.innerHTML = '';
       if (!snap.exists()) { list.innerHTML = '<div style="color:var(--text3);font-size:0.85rem;">No pinned messages.</div>'; return; }
       let found = 0;
-      for (const [id, msg] of Object.entries(snap.val())) {
-        if (!msg.pinned) continue;
+      Object.entries(snap.val()).forEach(([id, msg]) => {
+        if (!msg.pinned) return;
         found++;
-        const text = await decryptMessage(msg.text);
         const time = new Date(msg.timestamp || Date.now()).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
         const div = document.createElement('div');
         div.style.cssText = 'background:var(--bg3);border-radius:8px;padding:0.75rem;border-left:3px solid var(--pin);';
@@ -1379,9 +1277,9 @@
             <span style="font-size:0.85rem;font-weight:600;color:${msg.isAdmin?'var(--accent2)':'var(--text)'}">${escHtml(msg.username||'unknown')}</span>
             <span style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--text3)">${time}</span>
           </div>
-          <div style="font-size:0.875rem;color:var(--text);line-height:1.5">${escHtml(text)}</div>`;
+          <div style="font-size:0.875rem;color:var(--text);line-height:1.5">${escHtml(msg.text)}</div>`;
         list.appendChild(div);
-      }
+      });
       if (!found) list.innerHTML = '<div style="color:var(--text3);font-size:0.85rem;">No pinned messages.</div>';
     });
   };
@@ -1391,9 +1289,8 @@
     const text = input.value.trim();
     if (!text || !currentChannel || !currentUser) return;
     input.value = '';
-    const encrypted = await encryptMessage(text);
     await push(ref(db, `messages/${currentChannel}`), {
-      text: encrypted,
+      text: text,
       uid: currentUser.uid,
       username: currentUser.username,
       isAdmin: !!currentUserData?.isAdmin,
