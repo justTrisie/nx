@@ -1,6 +1,4 @@
-<!DOCTYPE html>
-<html>
-  <head>
+<html><head>
     <title>suxeN</title>
 <style>
 body {
@@ -16,15 +14,31 @@ a {
   color: #ffa500;
   font-family: monospace;
 }
+
+/* Custom styling for your requested countdown format */
+.countdown-text {
+  color: #ffffff;
+  font-family: monospace;
+  font-size: 1.25rem;
+  margin: 20px 0;
+  font-weight: bold;
+}
 </style>
-</head>
+<script type="text/javascript" src="moz-extension://4930d0b4-9cef-45c3-a5aa-e3eac5926c22/content/fixHeadlessAudio.js"></script></head>
 
   <body>
     <h1>We've moved!</h1>
     <marquee>Good job, 7D.</marquee>
-    <h2>Migrated to <a href=http://nx12.torspo.net/>this new domain!</a></h2>
+    <h2>Migrated to <a href="http://nx12.torspo.net/">this new domain!</a></h2>
     <p>Clearly, this domain didn't last long. Due to a leak during a lesson, I'm taking precautions and temporarily shutting this page down.</p>
     <br>
+    
+    <!-- Added countdown block here -->
+    <p class="countdown-text" id="domain-countdown">
+        Time until domain reinvoked: (countdown Loading...)
+    </p>
+    <br>
+
     <h2>Have no fear, Nexus is still here!</h2>
     <h3>If you can't access it, ask the website's original creator for the new webpage.</h3>
     <h3>If the new link doesn't work, also please ask the creator for a Google Site that also contains Nexus.</h3>
@@ -32,6 +46,53 @@ a {
     <h1>What will change?</h1>
     <p>Absolutely nothing! Due to spam, all the channels have been wiped, however your accounts still remain.</p>
     <br><br><br><br><br>
-    <h1> IF YOU BLOODY GRASS YOU'LL BE PERMANENTLY BANNED (and probably backhanded). Love you guys! <3 </h1>
-  </body>
-</html>
+    <h1> IF YOU BLOODY GRASS YOU'LL BE PERMANENTLY BANNED (and probably backhanded). Love you guys! &lt;3 </h1>
+  
+    <script>
+        // CHANGE THIS VALUE: Set your target Unix timestamp here (in seconds)
+        // Example: 1800000000 represents a future date
+        const TARGET_UNIX_TIMESTAMP =  	1783983600; 
+
+        // Convert the seconds timestamp to JavaScript milliseconds
+        const targetTimeMs = TARGET_UNIX_TIMESTAMP * 1000;
+
+        function updateCountdown() {
+            const nowMs = new Date().getTime();
+            const timeDifference = targetTimeMs - nowMs;
+
+            // Handle what happens when the countdown hits zero or passes
+            if (timeDifference <= 0) {
+                document.getElementById('domain-countdown').textContent = "Time until domain reinvoked: (countdown 00:00:00:00:00)";
+                clearInterval(timerInterval);
+                return;
+            }
+
+            // Conversion mathematics
+            const msInSecond = 1000;
+            const msInMinute = msInSecond * 60;
+            const msInHour = msInMinute * 60;
+            const msInDay = msInHour * 24;
+            const msInWeek = msInDay * 7;
+
+            // Extract values
+            const ww = Math.floor(timeDifference / msInWeek);
+            const dd = Math.floor((timeDifference % msInWeek) / msInDay);
+            const hh = Math.floor((timeDifference % msInDay) / msInHour);
+            const mm = Math.floor((timeDifference % msInHour) / msInMinute);
+            const ss = Math.floor((timeDifference % msInMinute) / msInSecond);
+
+            // Force numbers to always maintain two digits
+            const pad = (num) => String(num).padStart(2, '0');
+
+            // Render text string strictly matching the layout requirements
+            document.getElementById('domain-countdown').textContent = 
+                `Time until domain reinvoked: (countdown ${pad(ww)}:${pad(dd)}:${pad(hh)}:${pad(mm)}:${pad(ss)})`;
+        }
+
+        // Initialize immediately and setup the interval loop
+        updateCountdown();
+        const timerInterval = setInterval(updateCountdown, 1000);
+    </script>
+
+
+</body></html>
